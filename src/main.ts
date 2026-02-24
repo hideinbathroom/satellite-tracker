@@ -1,8 +1,8 @@
 /**
- * GPS Satellite Tracker — Application Entry Point
+ * GPS Satellite Tracker — Application Entry Point (v2)
  *
- * Wires together the satellite data layer, 3D scene, and UI panels.
- * Manages the simulation clock and animation loop.
+ * Now passes constellation + health data to 3D renderer for
+ * color-coded visualization. Adds hover tooltips via raycasting.
  */
 
 import * as THREE from 'three';
@@ -29,65 +29,63 @@ import {
 } from './ui/panels';
 import type { Settings } from './ui/panels';
 
-/* ═══════════════════════════════════════════════════════════════
-   Simulation State
-   ═══════════════════════════════════════════════════════════════ */
-
 let simTime = new Date();
 let simSpeed = 1;
 let simPlaying = true;
 let selectedSatId: string | null = null;
 let lastFrameTime = performance.now();
 
-/* ═══════════════════════════════════════════════════════════════
-   Bootstrap
-   ═══════════════════════════════════════════════════════════════ */
+/** Derive constellation from satellite name */
+function deriveConstellation(name: string): string {
+  const upper = name.toUpperCase();
+  if (upper.includes('GPS') || upper.includes('NAVSTAR')) return 'GPS (USA)';
+  if (upper.includes('GLONASS') || upper.includes('COSMOS')) return 'GLONASS (Russia)';
+  if (upper.includes('GALILEO') || upper.includes('GSAT')) return 'Galileo (EU)';
+  if (upper.includes('BEIDOU') || upper.includes('COMPASS')) return 'BeiDou (China)';
+  return 'Unknown';
+}
+
+/** Derive health from satellite data */
+function deriveHealth(s: { position: { alt: number } | null; orbitalInfo: { eccentricity: number } }): 'healthy' | 'degraded' | 'offline' {
+  if (!s.position) return 'offline';
+  const alt = s.position.alt;
+  if (alt < 15000 || alt > 30000) return 'offline';
+  if (s.orbitalInfo.eccentricity > 0.02) return 'degraded';
+  return 'healthy';
+}
 
 async function main(): Promise<void> {
-  // --- UI ---
   initUI();
   showLoading('Initializing 3D scene…');
 
-  // --- 3D Scene ---
   const container = document.getElementById('scene-container')!;
   const sceneManager = new SceneManager(container);
   sceneManager.init();
 
   updateLoadingProgress(30, 'Fetching satellite TLE data…');
 
-  // --- Satellite Data ---
   const satManager = new SatelliteManager();
   await satManager.init();
 
   updateLoadingProgress(70, 'Computing orbital paths…');
 
-  // Initial position update
   satManager.updatePositions(simTime);
 
-  // Build initial satellite list for UI
   const allSats = satManager.getSatellites();
   const uiSats = allSats.map(toUISatellite);
   updateSatelliteList(uiSats);
   updateStats(satManager.count);
 
-  // Push initial positions to 3D scene
   const positions = buildPositionData(satManager);
   sceneManager.updateSatellites(positions);
 
-  // Draw orbit paths for all satellites
   drawAllOrbits(satManager, sceneManager, simTime);
 
   updateLoadingProgress(100, 'Ready');
 
-  // --- Wire UI callbacks ---
-
-  onTimeSpeedChange((speed) => {
-    simSpeed = speed;
-  });
-
-  onPlayPauseToggle((playing) => {
-    simPlaying = playing;
-  });
+  // Wire UI callbacks
+  onTimeSpeedChange((speed) => { simSpeed = speed; });
+  onPlayPauseToggle((playing) => { simPlaying = playing; });
 
   onSatelliteSelect((noradId) => {
     selectedSatId = noradId;
@@ -95,22 +93,16 @@ async function main(): Promise<void> {
     if (sat) {
       showSatelliteInfo(toUISatellite(sat));
       sceneManager.satelliteRenderer.highlightSatellite(noradId);
-
-      // Focus camera on satellite
       const pos = sceneManager.satelliteRenderer.getPosition(noradId);
-      if (pos) {
-        sceneManager.focusOnSatellite(pos);
-      }
-
-      // Draw orbit for selected satellite
-      drawOrbitForSatellite(noradId, satManager, sceneManager, simTime);
+      if (pos) sceneManager.focusOnSatellite(pos);
+      const constellation = deriveConstellation(sat.data.name);
+      drawOrbitForSatellite(noradId, satManager, sceneManager, simTime, constellation);
     }
   });
 
   onSettingsChange((s: Settings) => {
     sceneManager.orbitRenderer.setVisible(s.showOrbits);
     sceneManager.satelliteRenderer.setLabelsVisible(s.showLabels);
-    // Atmosphere toggle
     const earthGroup = sceneManager.getScene().getObjectByName('earth');
     if (earthGroup) {
       const atmos = earthGroup.getObjectByName('atmosphere');
@@ -124,7 +116,7 @@ async function main(): Promise<void> {
     drawAllOrbits(satManager, sceneManager, simTime);
   });
 
-  // --- Raycasting for satellite click ---
+  // Raycasting for click + hover
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
 
@@ -148,17 +140,44 @@ async function main(): Promise<void> {
           sceneManager.satelliteRenderer.highlightSatellite(id);
           const pos = sceneManager.satelliteRenderer.getPosition(id);
           if (pos) sceneManager.focusOnSatellite(pos);
-          drawOrbitForSatellite(id, satManager, sceneManager, simTime);
+          const constellation = deriveConstellation(sat.data.name);
+          drawOrbitForSatellite(id, satManager, sceneManager, simTime, constellation);
         }
       }
     }
   });
 
-  // --- Hide loading & start animation ---
+  // Hover tooltip
+  container.addEventListener('mousemove', (event) => {
+    const rect = container.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, sceneManager.getCamera());
+    const intersects = raycaster.intersectObject(
+      sceneManager.satelliteRenderer.getMesh()
+    );
+
+    if (intersects.length > 0 && intersects[0].instanceId !== undefined) {
+      const id = sceneManager.satelliteRenderer.getIdAtIndex(intersects[0].instanceId);
+      if (id) {
+        sceneManager.satelliteRenderer.showTooltip(id, event.clientX, event.clientY);
+        container.style.cursor = 'pointer';
+      }
+    } else {
+      sceneManager.satelliteRenderer.hideTooltip();
+      container.style.cursor = 'default';
+    }
+  });
+
+  container.addEventListener('mouseleave', () => {
+    sceneManager.satelliteRenderer.hideTooltip();
+  });
+
+  // Hide loading & start animation
   hideLoading();
   lastFrameTime = performance.now();
 
-  // --- Single animation loop (data + scene + render) ---
   const animate = (): void => {
     requestAnimationFrame(animate);
 
@@ -166,38 +185,27 @@ async function main(): Promise<void> {
     const deltaMs = now - lastFrameTime;
     lastFrameTime = now;
 
-    // Advance simulation time
     if (simPlaying) {
       simTime = new Date(simTime.getTime() + deltaMs * simSpeed);
     }
 
-    // Update satellite positions
     satManager.updatePositions(simTime);
 
-    // Push to 3D scene
     const pos = buildPositionData(satManager);
     sceneManager.updateSatellites(pos);
 
-    // Update UI time display
     updateTimeDisplay(simTime, simSpeed);
     updateStatsTime(simTime);
 
-    // Update selected satellite info panel
     if (selectedSatId) {
       const sat = satManager.getSatelliteById(selectedSatId);
-      if (sat) {
-        updateSatelliteInfoPosition(toUISatellite(sat));
-      }
+      if (sat) updateSatelliteInfoPosition(toUISatellite(sat));
     }
 
-    // Update scene components (earth rotation, starfield, controls) and render
     sceneManager.update();
   };
 
-  // Start the clock so delta tracking works
   sceneManager.startClock();
-
-  // Start the single unified loop
   animate();
 }
 
@@ -214,6 +222,8 @@ function buildPositionData(satManager: SatelliteManager): SatellitePositionData[
       x: s.position!.x,
       y: s.position!.y,
       z: s.position!.z,
+      constellation: deriveConstellation(s.data.name),
+      health: deriveHealth(s),
     }));
 }
 
@@ -224,7 +234,9 @@ function drawAllOrbits(
 ): void {
   sceneManager.orbitRenderer.clearAll();
   for (const noradId of satManager.getNoradIds()) {
-    drawOrbitForSatellite(noradId, satManager, sceneManager, date);
+    const sat = satManager.getSatelliteById(noradId);
+    const constellation = sat ? deriveConstellation(sat.data.name) : undefined;
+    drawOrbitForSatellite(noradId, satManager, sceneManager, date, constellation);
   }
 }
 
@@ -233,22 +245,17 @@ function drawOrbitForSatellite(
   satManager: SatelliteManager,
   sceneManager: SceneManager,
   date: Date,
+  constellation?: string,
 ): void {
   const pathData = satManager.getOrbitPath(noradId, 180, date);
   if (pathData.length > 0) {
     const vectors = pathData.map((p) => new THREE.Vector3(p.x, p.y, p.z));
-    sceneManager.orbitRenderer.drawOrbit(noradId, vectors);
+    sceneManager.orbitRenderer.drawOrbit(noradId, vectors, constellation);
   }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   Start
-   ═══════════════════════════════════════════════════════════════ */
-
 main().catch((err) => {
   console.error('Failed to initialize GPS Satellite Tracker:', err);
-
-  // Show user-visible error instead of a blank screen
   const overlay = document.getElementById('loading-overlay');
   const status = document.getElementById('loading-status');
   if (overlay && status) {

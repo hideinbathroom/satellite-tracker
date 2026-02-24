@@ -1,12 +1,19 @@
 /**
- * Orbital Path Rendering — gradient trail lines
+ * Orbital Path Rendering — constellation-colored gradient trails
  *
- * Draws orbital paths as lines with a custom shader that fades opacity
- * along the path length, giving a comet-trail effect. Uses BufferGeometry
- * with per-vertex alpha for GPU-efficient gradient rendering.
+ * Draws orbital paths with colors matching their constellation.
+ * Gradient fades along the path for a comet-trail effect.
  */
 
 import * as THREE from 'three';
+
+const CONSTELLATION_ORBIT_COLORS: Record<string, THREE.Color> = {
+  'GPS (USA)': new THREE.Color(0x00ff88),
+  'GLONASS (Russia)': new THREE.Color(0xff8800),
+  'Galileo (EU)': new THREE.Color(0xaa66ff),
+  'BeiDou (China)': new THREE.Color(0xffdd00),
+  'Unknown': new THREE.Color(0x00d4ff),
+};
 
 interface OrbitEntry {
   line: THREE.Line;
@@ -22,11 +29,8 @@ export class OrbitRenderer {
     this.scene = scene;
   }
 
-  /** Draw or update an orbital path */
-  drawOrbit(id: string, points: THREE.Vector3[]): void {
-    // Remove existing orbit with this ID
+  drawOrbit(id: string, points: THREE.Vector3[], constellation?: string): void {
     this.removeOrbit(id);
-
     if (points.length < 2) return;
 
     const count = points.length;
@@ -37,10 +41,12 @@ export class OrbitRenderer {
       positions[i * 3] = points[i].x;
       positions[i * 3 + 1] = points[i].y;
       positions[i * 3 + 2] = points[i].z;
-
-      // Gradient: full opacity at start, fading toward end
       alphas[i] = 1.0 - (i / (count - 1)) * 0.7;
     }
+
+    const color = constellation && CONSTELLATION_ORBIT_COLORS[constellation]
+      ? CONSTELLATION_ORBIT_COLORS[constellation]
+      : CONSTELLATION_ORBIT_COLORS['Unknown'];
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -48,13 +54,12 @@ export class OrbitRenderer {
 
     const material = new THREE.ShaderMaterial({
       uniforms: {
-        uColor: { value: new THREE.Color(0x00d4ff) },
-        uOpacity: { value: 0.4 },
+        uColor: { value: color },
+        uOpacity: { value: 0.35 },
       },
       vertexShader: /* glsl */ `
         attribute float alpha;
         varying float vAlpha;
-
         void main() {
           vAlpha = alpha;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -64,7 +69,6 @@ export class OrbitRenderer {
         uniform vec3 uColor;
         uniform float uOpacity;
         varying float vAlpha;
-
         void main() {
           gl_FragColor = vec4(uColor, vAlpha * uOpacity);
         }
@@ -83,7 +87,6 @@ export class OrbitRenderer {
     this.orbits.set(id, { line, id });
   }
 
-  /** Remove a specific orbit path */
   removeOrbit(id: string): void {
     const entry = this.orbits.get(id);
     if (entry) {
@@ -94,16 +97,13 @@ export class OrbitRenderer {
     }
   }
 
-  /** Remove all orbit paths */
   clearAll(): void {
-    // Collect IDs first to avoid mutating the map during iteration
     const ids = Array.from(this.orbits.keys());
     for (const id of ids) {
       this.removeOrbit(id);
     }
   }
 
-  /** Toggle visibility of all orbits */
   setVisible(visible: boolean): void {
     this.visible = visible;
     for (const [, entry] of this.orbits) {
@@ -111,12 +111,10 @@ export class OrbitRenderer {
     }
   }
 
-  /** Check if orbits are currently visible */
   isVisible(): boolean {
     return this.visible;
   }
 
-  /** Clean up all GPU resources */
   dispose(): void {
     this.clearAll();
   }
