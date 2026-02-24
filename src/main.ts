@@ -24,16 +24,20 @@ import {
   onPlayPauseToggle,
   onSatelliteSelect,
   onSettingsChange,
+  onGroupsChange,
   onResetTime,
   toUISatellite,
 } from './ui/panels';
-import type { Settings } from './ui/panels';
+import type { Settings, SatelliteGroups } from './ui/panels';
 
 let simTime = new Date();
 let simSpeed = 1;
 let simPlaying = true;
 let selectedSatId: string | null = null;
 let lastFrameTime = performance.now();
+
+// Active constellation filters
+let activeGroups: SatelliteGroups = { gps: true, glonass: true, galileo: true };
 
 /** Derive constellation from satellite name */
 function deriveConstellation(name: string): string {
@@ -74,7 +78,7 @@ async function main(): Promise<void> {
   const allSats = satManager.getSatellites();
   const uiSats = allSats.map(toUISatellite);
   updateSatelliteList(uiSats);
-  updateStats(satManager.count);
+  updateStats(allSats.length);
 
   const positions = buildPositionData(satManager);
   sceneManager.updateSatellites(positions);
@@ -112,6 +116,22 @@ async function main(): Promise<void> {
 
   onResetTime(() => {
     simTime = new Date();
+    satManager.clearOrbitCache();
+    drawAllOrbits(satManager, sceneManager, simTime);
+  });
+
+  // Group filter callback — filters both 3D scene and UI list
+  onGroupsChange((groups: SatelliteGroups) => {
+    activeGroups = groups;
+    // Refresh UI list
+    const filtered = getFilteredSatellites(satManager);
+    const uiSats = filtered.map(toUISatellite);
+    updateSatelliteList(uiSats);
+    updateStats(filtered.length);
+    // Refresh 3D scene
+    const positions = buildPositionData(satManager);
+    sceneManager.updateSatellites(positions);
+    // Redraw orbits for visible satellites only
     satManager.clearOrbitCache();
     drawAllOrbits(satManager, sceneManager, simTime);
   });
@@ -213,8 +233,25 @@ async function main(): Promise<void> {
    Helpers
    ═══════════════════════════════════════════════════════════════ */
 
+/** Check if a constellation is currently enabled */
+function isConstellationActive(constellation: string): boolean {
+  if (constellation === 'GPS (USA)') return activeGroups.gps;
+  if (constellation === 'GLONASS (Russia)') return activeGroups.glonass;
+  if (constellation === 'Galileo (EU)') return activeGroups.galileo;
+  // BeiDou and Unknown always shown if any group is active
+  return true;
+}
+
+/** Get satellites filtered by active constellation groups */
+function getFilteredSatellites(satManager: SatelliteManager) {
+  return satManager.getSatellites().filter((s) => {
+    const constellation = deriveConstellation(s.data.name);
+    return isConstellationActive(constellation);
+  });
+}
+
 function buildPositionData(satManager: SatelliteManager): SatellitePositionData[] {
-  return satManager.getSatellites()
+  return getFilteredSatellites(satManager)
     .filter((s) => s.position !== null)
     .map((s) => ({
       id: s.data.noradId,
@@ -235,7 +272,9 @@ function drawAllOrbits(
   sceneManager.orbitRenderer.clearAll();
   for (const noradId of satManager.getNoradIds()) {
     const sat = satManager.getSatelliteById(noradId);
-    const constellation = sat ? deriveConstellation(sat.data.name) : undefined;
+    if (!sat) continue;
+    const constellation = deriveConstellation(sat.data.name);
+    if (!isConstellationActive(constellation)) continue;
     drawOrbitForSatellite(noradId, satManager, sceneManager, date, constellation);
   }
 }

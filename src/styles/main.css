@@ -403,21 +403,30 @@ html, body {
 .reset-btn { width: 32px; height: 32px; }
 
 /* ══════════════════════════════════════════════════════════════
-   MOBILE BOTTOM SHEET UX
+   MOBILE NAVIGATION BAR
    ══════════════════════════════════════════════════════════════ */
-
-/* Bottom sheet handle */
-.bottom-sheet-handle {
+.mobile-nav {
   display: none; /* Hidden on desktop */
-  justify-content: center; align-items: center;
-  padding: 10px 0 6px; cursor: grab; touch-action: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  z-index: 300;
+  background: rgba(10, 10, 30, 0.95);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-panel);
+  padding: 6px 0 env(safe-area-inset-bottom, 6px);
+  justify-content: space-around; align-items: center;
 }
-.handle-bar {
-  width: 40px; height: 4px; border-radius: 2px;
-  background: rgba(255, 255, 255, 0.2);
-  transition: background var(--duration-fast);
+
+.mobile-nav-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: none; border: none; color: var(--text-tertiary);
+  font-family: var(--font-primary); font-size: 10px; font-weight: 500;
+  padding: 6px 16px; cursor: pointer; transition: color var(--duration-fast);
+  -webkit-tap-highlight-color: transparent;
 }
-.bottom-sheet-handle:hover .handle-bar { background: rgba(255, 255, 255, 0.4); }
+.mobile-nav-btn.active { color: var(--accent-cyan); }
+.mobile-nav-btn:hover { color: var(--text-primary); }
+.mobile-nav-btn svg { transition: transform var(--duration-fast); }
+.mobile-nav-btn.active svg { transform: scale(1.1); }
 
 /* ══════════════════════════════════════════════════════════════
    RESPONSIVE — Tablet
@@ -429,98 +438,99 @@ html, body {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   RESPONSIVE — Mobile (Bottom Sheet)
+   RESPONSIVE — Mobile
    ══════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* Bottom sheet handle visible */
-  .bottom-sheet-handle { display: flex; }
+  /* Show mobile nav */
+  .mobile-nav { display: flex; }
 
-  /* Sidebar becomes bottom sheet */
+  /* Hide desktop sidebar and settings by default */
   .satellite-sidebar {
-    top: auto !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
-    width: 100% !important; border-radius: 16px 16px 0 0;
-    transition: height var(--duration-slow) var(--ease-out);
-    max-height: 85vh;
+    position: fixed; top: 0 !important; left: 0 !important; right: 0 !important;
+    bottom: 56px !important; /* Above mobile nav */
+    width: 100% !important; height: auto !important;
+    border-radius: 0; z-index: 250;
+    display: none; /* Hidden by default, shown via .mobile-visible */
+  }
+  .satellite-sidebar.mobile-visible {
+    display: flex;
   }
   .satellite-sidebar.collapsed { width: 100% !important; }
+  .satellite-sidebar.collapsed .sidebar-body,
+  .satellite-sidebar.collapsed .sidebar-title,
+  .satellite-sidebar.collapsed .count-badge { opacity: 1; pointer-events: auto; }
 
-  /* Bottom sheet states */
-  .satellite-sidebar.sheet-peek { height: 60px; overflow: hidden; }
-  .satellite-sidebar.sheet-half { height: 45vh; overflow: hidden; }
-  .satellite-sidebar.sheet-full { height: 85vh; overflow: hidden; }
+  /* Settings panel — full screen overlay on mobile */
+  .settings-panel {
+    top: 0 !important; left: 0 !important; right: 0 !important;
+    bottom: 56px !important;
+    width: 100% !important; min-width: 100% !important;
+    border-radius: 0; z-index: 250;
+    display: none; padding: var(--panel-padding);
+    overflow-y: auto;
+  }
+  .settings-panel.mobile-visible {
+    display: block;
+  }
+  .settings-panel.mobile-visible .settings-body {
+    width: 100%; padding: var(--panel-padding) 0;
+  }
+  .settings-panel.mobile-visible .settings-toggle { display: none; }
 
-  .satellite-sidebar.sheet-peek .sidebar-body { opacity: 0; pointer-events: none; }
-  .satellite-sidebar.sheet-peek .sidebar-header { border-bottom: none; }
-
-  .satellite-sidebar .sidebar-collapse-btn svg { transform: rotate(-90deg); }
-  .satellite-sidebar.sheet-half .sidebar-collapse-btn svg,
-  .satellite-sidebar.sheet-full .sidebar-collapse-btn svg { transform: rotate(90deg); }
-
-  /* Info panel — slides up from bottom on mobile */
+  /* Info panel — overlay card at top */
   .satellite-info {
-    top: auto !important; bottom: 0 !important; left: 0 !important; right: 0 !important;
-    width: 100% !important; border-radius: 16px 16px 0 0;
-    max-height: 50vh; overflow-y: auto;
-    animation: mobile-slide-up var(--duration-normal) var(--ease-out);
+    top: 8px !important; left: 8px !important; right: 8px !important;
+    bottom: auto !important;
+    width: auto !important; max-height: 45vh; overflow-y: auto;
+    z-index: 260; border-radius: var(--panel-radius);
   }
 
-  @keyframes mobile-slide-up {
-    from { opacity: 0; transform: translateY(100%); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* Time controls — compact bottom bar */
+  /* Time controls — above mobile nav */
   .time-controls {
-    bottom: 0 !important; left: 0 !important; right: 0 !important;
-    transform: none !important; border-radius: 0;
-    justify-content: center; flex-wrap: wrap; gap: 8px; padding: 10px 14px;
-    border-top: 1px solid var(--border-panel);
+    bottom: 64px !important; left: 8px !important; right: 8px !important;
+    transform: none !important; border-radius: var(--panel-radius);
+    justify-content: center; flex-wrap: wrap; gap: 8px; padding: 8px 14px;
+    z-index: 200;
   }
+  .time-controls.mobile-hidden { display: none; }
   .speed-slider { width: 60px; }
 
-  /* Stats bar — minimal pill */
+  /* Stats bar — minimal */
   .stats-bar {
     top: 8px; padding: 6px 14px; gap: 10px;
-    max-width: calc(100% - 80px);
+    max-width: calc(100% - 16px); z-index: 200;
   }
   .stat-label { display: none; }
   .constellation-summary { display: none; }
 
-  /* Settings */
-  .settings-panel { top: 8px; left: 8px; }
+  /* Hide desktop settings toggle on mobile */
+  .settings-panel:not(.mobile-visible) .settings-toggle { display: none; }
 
-  /* Mini map hidden on mobile to save space */
+  /* Mini map hidden on mobile */
   .mini-map-container { display: none; }
 }
 
 @media (max-width: 480px) {
   .time-datetime-group { display: none; }
   .time-divider { display: none; }
-  .stats-bar { max-width: calc(100% - 60px); }
 }
 
 /* Landscape mobile */
 @media (max-height: 500px) and (orientation: landscape) {
+  .mobile-nav { display: none; }
+
   .satellite-sidebar {
     top: 0 !important; left: auto !important; right: 0 !important; bottom: 0 !important;
     width: 300px !important; height: 100% !important; max-height: 100vh;
-    border-radius: 0;
+    border-radius: 0; display: flex;
   }
-  .satellite-sidebar.sheet-peek,
-  .satellite-sidebar.sheet-half,
-  .satellite-sidebar.sheet-full { height: 100% !important; }
-  .bottom-sheet-handle { display: none; }
-  .satellite-sidebar .sidebar-body { opacity: 1; pointer-events: auto; }
-
   .satellite-info {
     top: 0 !important; left: 0 !important; right: auto !important; bottom: auto !important;
     width: 280px !important; max-height: 100vh; border-radius: 0;
   }
-
   .time-controls {
     bottom: 8px !important; left: 50% !important; right: auto !important;
-    transform: translateX(-50%) !important; border-radius: 24px;
-    width: auto;
+    transform: translateX(-50%) !important; border-radius: 24px; width: auto;
   }
 }
 

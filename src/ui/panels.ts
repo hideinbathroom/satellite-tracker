@@ -199,71 +199,67 @@ function setupMobileDetection(): void {
     isMobile = window.innerWidth <= 768;
     document.body.classList.toggle('is-mobile', isMobile);
     if (isMobile) {
-      setupBottomSheet();
+      setupMobileNav();
     }
   };
   checkMobile();
   window.addEventListener('resize', checkMobile);
 }
 
-function setupBottomSheet(): void {
-  const sidebar = els.satelliteSidebar;
-  if (!sidebar) return;
+function setupMobileNav(): void {
+  const nav = document.getElementById('mobile-nav');
+  if (!nav) return;
 
-  // Add drag handle if not exists
-  if (!sidebar.querySelector('.bottom-sheet-handle')) {
-    const handle = document.createElement('div');
-    handle.className = 'bottom-sheet-handle';
-    handle.innerHTML = '<div class="handle-bar"></div>';
-    sidebar.insertBefore(handle, sidebar.firstChild);
+  const buttons = nav.querySelectorAll<HTMLButtonElement>('.mobile-nav-btn');
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      if (!tab) return;
 
-    let startY = 0;
-    let startHeight = 0;
+      // Update active state
+      buttons.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
 
-    handle.addEventListener('touchstart', (e) => {
-      startY = e.touches[0].clientY;
-      startHeight = sidebar.getBoundingClientRect().height;
-      sidebar.style.transition = 'none';
-    }, { passive: true });
-
-    handle.addEventListener('touchmove', (e) => {
-      const deltaY = startY - e.touches[0].clientY;
-      const newHeight = Math.max(60, Math.min(window.innerHeight * 0.85, startHeight + deltaY));
-      sidebar.style.height = `${newHeight}px`;
-    }, { passive: true });
-
-    handle.addEventListener('touchend', () => {
-      sidebar.style.transition = '';
-      const h = sidebar.getBoundingClientRect().height;
-      const vh = window.innerHeight;
-      if (h < vh * 0.2) {
-        setBottomSheetState('peek');
-      } else if (h < vh * 0.55) {
-        setBottomSheetState('half');
-      } else {
-        setBottomSheetState('full');
-      }
+      switchMobileTab(tab);
     });
+  });
 
-    // Click handle to cycle states
-    handle.addEventListener('click', () => {
-      if (bottomSheetState === 'peek') setBottomSheetState('half');
-      else if (bottomSheetState === 'half') setBottomSheetState('full');
-      else setBottomSheetState('peek');
-    });
-  }
-
-  setBottomSheetState('peek');
+  // Default to globe view
+  switchMobileTab('globe');
 }
 
-function setBottomSheetState(state: 'peek' | 'half' | 'full'): void {
-  bottomSheetState = state;
+function switchMobileTab(tab: string): void {
   const sidebar = els.satelliteSidebar;
-  if (!sidebar) return;
+  const settingsPanel = document.getElementById('settings-panel');
+  const timeControls = document.getElementById('time-controls');
 
-  sidebar.classList.remove('sheet-peek', 'sheet-half', 'sheet-full');
-  sidebar.classList.add(`sheet-${state}`);
-  sidebar.style.height = '';
+  // Hide all panels first
+  if (sidebar) sidebar.classList.remove('mobile-visible');
+  if (settingsPanel) settingsPanel.classList.remove('mobile-visible');
+
+  switch (tab) {
+    case 'globe':
+      // Just show the 3D scene, hide panels
+      if (timeControls) timeControls.classList.remove('mobile-hidden');
+      break;
+    case 'list':
+      // Show satellite sidebar as full overlay
+      if (sidebar) sidebar.classList.add('mobile-visible');
+      if (timeControls) timeControls.classList.add('mobile-hidden');
+      break;
+    case 'settings':
+      // Show settings as full overlay
+      if (settingsPanel) {
+        settingsPanel.classList.add('mobile-visible');
+        els.settingsBody.hidden = false;
+      }
+      if (timeControls) timeControls.classList.add('mobile-hidden');
+      break;
+  }
+}
+
+function setBottomSheetState(_state: 'peek' | 'half' | 'full'): void {
+  // No-op now — replaced by mobile nav tabs
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -456,9 +452,12 @@ export function getGroups(): SatelliteGroups {
 function bindSidebar(): void {
   els.sidebarToggle.addEventListener('click', () => {
     if (isMobile) {
-      // On mobile, toggle bottom sheet
-      if (bottomSheetState === 'peek') setBottomSheetState('half');
-      else setBottomSheetState('peek');
+      // On mobile, switch to globe tab
+      const nav = document.getElementById('mobile-nav');
+      if (nav) {
+        const globeBtn = nav.querySelector('[data-tab="globe"]');
+        if (globeBtn) (globeBtn as HTMLButtonElement).click();
+      }
       return;
     }
     const sidebar = els.satelliteSidebar;
@@ -547,7 +546,14 @@ function renderSatelliteList(): void {
       if (id) {
         selectSatelliteById(id);
         onSatSelectCb?.(id);
-        if (isMobile) setBottomSheetState('peek');
+        // On mobile, switch back to globe view to see the satellite
+        if (isMobile) {
+          const nav = document.getElementById('mobile-nav');
+          if (nav) {
+            const globeBtn = nav.querySelector('[data-tab="globe"]');
+            if (globeBtn) (globeBtn as HTMLButtonElement).click();
+          }
+        }
       }
     };
     item.addEventListener('click', handler);
@@ -609,10 +615,6 @@ export function showSatelliteInfo(sat: UISatellite): void {
 
   // Set panel accent color
   els.satelliteInfo.style.setProperty('--info-accent', color);
-
-  if (isMobile) {
-    setBottomSheetState('peek');
-  }
 }
 
 export function hideSatelliteInfo(): void {

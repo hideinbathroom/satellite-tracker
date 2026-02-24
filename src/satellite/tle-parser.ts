@@ -14,9 +14,12 @@
 import * as satellite from 'satellite.js';
 import type { TLEData, SatelliteData } from '../types';
 
-/** CelesTrak GP data endpoint for operational GPS satellites */
-const CELESTRAK_GPS_URL =
-  'https://celestrak.org/NORAD/elements/gp.php?GROUP=gps-ops&FORMAT=tle';
+/** CelesTrak GP data endpoints for GNSS constellations */
+const CELESTRAK_URLS: Record<string, string> = {
+  gps: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=gps-ops&FORMAT=tle',
+  glonass: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=glo-ops&FORMAT=tle',
+  galileo: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=galileo&FORMAT=tle',
+};
 
 /**
  * Validate a TLE line checksum (modulo 10).
@@ -131,45 +134,56 @@ export function initializeSatellites(tleEntries: TLEData[]): SatelliteData[] {
 }
 
 /**
- * Fetch GPS constellation TLE data from CelesTrak.
- * Falls back to embedded sample data on network failure or CORS issues.
+ * Fetch a single TLE source from CelesTrak with timeout.
+ */
+async function fetchSingleTLE(url: string): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
+  const response = await fetch(url, { signal: controller.signal });
+  clearTimeout(timeout);
+
+  if (!response.ok) throw new Error(`CelesTrak returned ${response.status}`);
+
+  const text = await response.text();
+  if (text.includes('<html') || text.includes('<!DOCTYPE')) {
+    throw new Error('CelesTrak returned HTML instead of TLE data');
+  }
+  return text;
+}
+
+/**
+ * Fetch TLE data for all GNSS constellations (GPS, GLONASS, Galileo).
+ * Each source is fetched independently — failures don't block others.
+ * Falls back to embedded GPS data if all fetches fail.
  */
 export async function fetchTLEData(): Promise<SatelliteData[]> {
-  let rawTLE: string;
+  const allTLEs: TLEData[] = [];
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-
-    const response = await fetch(CELESTRAK_GPS_URL, {
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      throw new Error(`CelesTrak returned ${response.status}`);
+  const fetchPromises = Object.entries(CELESTRAK_URLS).map(async ([name, url]) => {
+    try {
+      const rawTLE = await fetchSingleTLE(url);
+      const parsed = parseTLEText(rawTLE);
+      console.log(`Fetched ${parsed.length} ${name.toUpperCase()} satellites`);
+      return parsed;
+    } catch (err) {
+      console.warn(`Failed to fetch ${name} TLE data:`, err);
+      return [];
     }
+  });
 
-    rawTLE = await response.text();
-
-    // Sanity check: CelesTrak sometimes returns HTML error pages
-    if (rawTLE.includes('<html') || rawTLE.includes('<!DOCTYPE')) {
-      throw new Error('CelesTrak returned HTML instead of TLE data');
-    }
-  } catch (err) {
-    console.warn('CelesTrak fetch failed, using embedded fallback TLE data:', err);
-    rawTLE = FALLBACK_GPS_TLE;
+  const results = await Promise.all(fetchPromises);
+  for (const parsed of results) {
+    allTLEs.push(...parsed);
   }
 
-  const parsed = parseTLEText(rawTLE);
-
-  if (parsed.length === 0) {
-    console.warn('No valid TLEs from CelesTrak, falling back to embedded data');
+  if (allTLEs.length === 0) {
+    console.warn('All CelesTrak fetches failed, using embedded fallback');
     const fallbackParsed = parseTLEText(FALLBACK_GPS_TLE);
     return initializeSatellites(fallbackParsed);
   }
 
-  return initializeSatellites(parsed);
+  return initializeSatellites(allTLEs);
 }
 
 /**
