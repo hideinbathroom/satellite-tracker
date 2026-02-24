@@ -19,7 +19,7 @@ import { LabelManager } from './labels.js';
 import { CoverageRenderer } from './coverage.js';
 import { NetworkRenderer } from './network.js';
 
-const DEFAULT_CAMERA_POSITION = new THREE.Vector3(0, 2, 6);
+const DEFAULT_CAMERA_POSITION = new THREE.Vector3(0, 4, 12);
 const CAMERA_FOV = 45;
 const CAMERA_NEAR = 0.1;
 const CAMERA_FAR = 500;
