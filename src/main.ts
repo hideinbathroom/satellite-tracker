@@ -32,7 +32,7 @@ import {
 import type { Settings, SatelliteGroups } from './ui/panels';
 
 let simTime = new Date();
-let simSpeed = 1;
+let simSpeed = 1000;
 let simPlaying = true;
 let selectedSatId: string | null = null;
 let lastFrameTime = performance.now();
