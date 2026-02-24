@@ -144,7 +144,7 @@ html, body {
 /* ══════════════════════════════════════════════════════════════
    SETTINGS PANEL
    ══════════════════════════════════════════════════════════════ */
-.settings-panel { top: 16px; left: 16px; padding: 0; overflow: hidden; min-width: 44px; }
+.settings-panel { display: none; } /* Hidden on desktop — settings now in sidebar */
 .settings-toggle { margin: 4px; border: none; }
 .settings-body { padding: 0 var(--panel-padding) var(--panel-padding); width: 220px; }
 .settings-body[hidden] { display: none; }
@@ -172,9 +172,10 @@ html, body {
    SATELLITE SIDEBAR
    ══════════════════════════════════════════════════════════════ */
 .satellite-sidebar {
-  top: 72px; left: 16px; bottom: 80px; width: 300px;
+  top: 16px; left: 16px; bottom: 80px; width: 300px;
   display: flex; flex-direction: column; padding: 0; overflow: hidden;
   transition: width var(--duration-normal) var(--ease-out), opacity var(--duration-normal) var(--ease-out);
+  z-index: var(--z-panels);
 }
 .satellite-sidebar.collapsed { width: 44px; }
 .satellite-sidebar.collapsed .sidebar-body,
@@ -197,6 +198,12 @@ html, body {
   border: 1px solid rgba(0, 212, 255, 0.2); padding: 1px 7px; border-radius: 10px;
   white-space: nowrap; transition: opacity var(--duration-fast);
 }
+.sidebar-settings-btn { width: 28px; height: 28px; border: none; margin-left: auto; }
+.sidebar-settings-dropdown {
+  padding: 12px var(--panel-padding); border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0; overflow-y: auto; max-height: 50%;
+}
+.sidebar-settings-dropdown[hidden] { display: none; }
 .sidebar-body { display: flex; flex-direction: column; flex: 1; overflow: hidden; transition: opacity var(--duration-fast); }
 
 /* Search */
@@ -462,11 +469,13 @@ html, body {
 
   /* Settings panel — full screen overlay on mobile */
   .settings-panel {
+    display: none;
+    position: fixed;
     top: 0 !important; left: 0 !important; right: 0 !important;
     bottom: 56px !important;
     width: 100% !important; min-width: 100% !important;
     border-radius: 0; z-index: 250;
-    display: none; padding: var(--panel-padding);
+    padding: var(--panel-padding);
     overflow-y: auto;
   }
   .settings-panel.mobile-visible {
@@ -474,8 +483,13 @@ html, body {
   }
   .settings-panel.mobile-visible .settings-body {
     width: 100%; padding: var(--panel-padding) 0;
+    display: block !important; /* Override [hidden] attribute */
   }
   .settings-panel.mobile-visible .settings-toggle { display: none; }
+
+  /* Hide sidebar settings gear on mobile (use tab nav instead) */
+  .sidebar-settings-btn { display: none !important; }
+  .sidebar-settings-dropdown { display: none !important; }
 
   /* Info panel — overlay card at top */
   .satellite-info {

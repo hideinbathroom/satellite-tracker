@@ -239,19 +239,18 @@ function switchMobileTab(tab: string): void {
 
   switch (tab) {
     case 'globe':
-      // Just show the 3D scene, hide panels
       if (timeControls) timeControls.classList.remove('mobile-hidden');
       break;
     case 'list':
-      // Show satellite sidebar as full overlay
       if (sidebar) sidebar.classList.add('mobile-visible');
       if (timeControls) timeControls.classList.add('mobile-hidden');
       break;
     case 'settings':
-      // Show settings as full overlay
       if (settingsPanel) {
         settingsPanel.classList.add('mobile-visible');
+        // Force settings body visible — remove hidden attribute
         els.settingsBody.hidden = false;
+        els.settingsBody.removeAttribute('hidden');
       }
       if (timeControls) timeControls.classList.add('mobile-hidden');
       break;
@@ -390,20 +389,37 @@ function updateMiniMap(): void {
    ═══════════════════════════════════════════════════════════════ */
 
 function bindSettings(): void {
+  // Desktop: settings gear in sidebar header
+  const sidebarSettingsBtn = document.getElementById('sidebar-settings-btn');
+  const sidebarSettingsDropdown = document.getElementById('sidebar-settings-dropdown');
+
+  if (sidebarSettingsBtn && sidebarSettingsDropdown) {
+    sidebarSettingsBtn.addEventListener('click', () => {
+      const isOpen = !sidebarSettingsDropdown.hidden;
+      sidebarSettingsDropdown.hidden = isOpen;
+      sidebarSettingsBtn.setAttribute('aria-expanded', String(!isOpen));
+    });
+  }
+
+  // Original settings toggle (used on mobile via mobile-nav)
   els.settingsToggle.addEventListener('click', () => {
     const isOpen = !els.settingsBody.hidden;
     els.settingsBody.hidden = isOpen;
     els.settingsToggle.setAttribute('aria-expanded', String(!isOpen));
   });
 
+  // Close sidebar settings when clicking outside
   document.addEventListener('click', (e) => {
-    const panel = document.getElementById('settings-panel');
-    if (panel && !panel.contains(e.target as Node) && !els.settingsBody.hidden) {
-      els.settingsBody.hidden = true;
-      els.settingsToggle.setAttribute('aria-expanded', 'false');
+    if (sidebarSettingsDropdown && sidebarSettingsBtn &&
+        !sidebarSettingsDropdown.contains(e.target as Node) &&
+        !sidebarSettingsBtn.contains(e.target as Node) &&
+        !sidebarSettingsDropdown.hidden) {
+      sidebarSettingsDropdown.hidden = true;
+      sidebarSettingsBtn.setAttribute('aria-expanded', 'false');
     }
   });
 
+  // Bind BOTH sets of settings controls (original + sidebar duplicate)
   const emitSettings = () => {
     onSettingsChangeCb?.({
       showOrbits: els.settingOrbits.checked,
@@ -411,6 +427,28 @@ function bindSettings(): void {
       showAtmosphere: els.settingAtmosphere.checked,
     });
   };
+
+  // Sync sidebar settings (id with -2 suffix) to original settings
+  const syncSettings = (sourceId: string, targetId: string) => {
+    const source = document.getElementById(sourceId) as HTMLInputElement;
+    const target = document.getElementById(targetId) as HTMLInputElement;
+    if (source && target) {
+      source.addEventListener('change', () => {
+        target.checked = source.checked;
+        target.dispatchEvent(new Event('change'));
+      });
+      target.addEventListener('change', () => {
+        source.checked = target.checked;
+      });
+    }
+  };
+
+  syncSettings('setting-orbits-2', 'setting-orbits');
+  syncSettings('setting-labels-2', 'setting-labels');
+  syncSettings('setting-atmosphere-2', 'setting-atmosphere');
+  syncSettings('group-gps-2', 'group-gps');
+  syncSettings('group-glonass-2', 'group-glonass');
+  syncSettings('group-galileo-2', 'group-galileo');
 
   els.settingOrbits.addEventListener('change', emitSettings);
   els.settingLabels.addEventListener('change', emitSettings);

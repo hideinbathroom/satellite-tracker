@@ -42,8 +42,9 @@
   <!-- ═══════════════════════════════════════════
        SETTINGS PANEL (top-left)
   ════════════════════════════════════════════ -->
+  <!-- Settings panel is now hidden on desktop — integrated into sidebar header -->
   <div id="settings-panel" class="panel settings-panel" aria-label="Settings">
-    <button id="settings-toggle" class="icon-btn settings-toggle" aria-label="Toggle settings" aria-expanded="false">
+    <button id="settings-toggle" class="icon-btn settings-toggle" aria-label="Toggle settings" aria-expanded="false" style="display:none">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -98,6 +99,50 @@
       </button>
       <h2 class="sidebar-title">Satellites</h2>
       <span id="sat-count-badge" class="count-badge">0</span>
+      <!-- Settings gear in sidebar header -->
+      <button id="sidebar-settings-btn" class="icon-btn sidebar-settings-btn" aria-label="Toggle settings" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Settings dropdown inside sidebar -->
+    <div id="sidebar-settings-dropdown" class="sidebar-settings-dropdown" hidden>
+      <h3 class="panel-heading">Display Settings</h3>
+      <label class="toggle-row">
+        <span class="toggle-label">Orbit Paths</span>
+        <input type="checkbox" id="setting-orbits-2" class="toggle-input" checked />
+        <span class="toggle-switch" aria-hidden="true"></span>
+      </label>
+      <label class="toggle-row">
+        <span class="toggle-label">Satellite Labels</span>
+        <input type="checkbox" id="setting-labels-2" class="toggle-input" checked />
+        <span class="toggle-switch" aria-hidden="true"></span>
+      </label>
+      <label class="toggle-row">
+        <span class="toggle-label">Atmosphere</span>
+        <input type="checkbox" id="setting-atmosphere-2" class="toggle-input" checked />
+        <span class="toggle-switch" aria-hidden="true"></span>
+      </label>
+      <div class="settings-divider"></div>
+      <h3 class="panel-heading">Satellite Groups</h3>
+      <label class="toggle-row">
+        <span class="toggle-label">GPS (USA)</span>
+        <input type="checkbox" id="group-gps-2" class="toggle-input" checked />
+        <span class="toggle-switch" aria-hidden="true"></span>
+      </label>
+      <label class="toggle-row">
+        <span class="toggle-label">GLONASS (Russia)</span>
+        <input type="checkbox" id="group-glonass-2" class="toggle-input" checked />
+        <span class="toggle-switch" aria-hidden="true"></span>
+      </label>
+      <label class="toggle-row">
+        <span class="toggle-label">Galileo (EU)</span>
+        <input type="checkbox" id="group-galileo-2" class="toggle-input" checked />
+        <span class="toggle-switch" aria-hidden="true"></span>
+      </label>
     </div>
 
     <div id="sidebar-body" class="sidebar-body">
