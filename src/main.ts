@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { SatelliteManager } from './satellite/satellite-manager';
 import { SceneManager } from './scene/scene-manager';
 import type { SatellitePositionData } from './scene/satellites';
+import type { LabelData } from './scene/labels';
 import {
   initUI,
   showLoading,
@@ -98,7 +99,11 @@ async function main(): Promise<void> {
       showSatelliteInfo(toUISatellite(sat));
       sceneManager.satelliteRenderer.highlightSatellite(noradId);
       const pos = sceneManager.satelliteRenderer.getPosition(noradId);
-      if (pos) sceneManager.focusOnSatellite(pos);
+      if (pos) {
+        sceneManager.focusOnSatellite(pos);
+        const constellation = deriveConstellation(sat.data.name);
+        sceneManager.coverageRenderer.show(pos, constellation);
+      }
       const constellation = deriveConstellation(sat.data.name);
       drawOrbitForSatellite(noradId, satManager, sceneManager, simTime, constellation);
     }
@@ -107,11 +112,8 @@ async function main(): Promise<void> {
   onSettingsChange((s: Settings) => {
     sceneManager.orbitRenderer.setVisible(s.showOrbits);
     sceneManager.satelliteRenderer.setLabelsVisible(s.showLabels);
-    const earthGroup = sceneManager.getScene().getObjectByName('earth');
-    if (earthGroup) {
-      const atmos = earthGroup.getObjectByName('atmosphere');
-      if (atmos) atmos.visible = s.showAtmosphere;
-    }
+    sceneManager.labelManager.setVisible(s.showLabels);
+    sceneManager.setAtmosphereVisible(s.showAtmosphere);
   });
 
   onResetTime(() => {
@@ -159,7 +161,11 @@ async function main(): Promise<void> {
           showSatelliteInfo(toUISatellite(sat));
           sceneManager.satelliteRenderer.highlightSatellite(id);
           const pos = sceneManager.satelliteRenderer.getPosition(id);
-          if (pos) sceneManager.focusOnSatellite(pos);
+          if (pos) {
+            sceneManager.focusOnSatellite(pos);
+            const constellation = deriveConstellation(sat.data.name);
+            sceneManager.coverageRenderer.show(pos, constellation);
+          }
           const constellation = deriveConstellation(sat.data.name);
           drawOrbitForSatellite(id, satManager, sceneManager, simTime, constellation);
         }
@@ -214,6 +220,18 @@ async function main(): Promise<void> {
     const pos = buildPositionData(satManager);
     sceneManager.updateSatellites(pos);
 
+    // Update CSS2D labels
+    const { labels: lblData, posMap } = buildLabelData(pos);
+    sceneManager.labelManager.updateLabels(sceneManager.getScene(), lblData, posMap);
+
+    // Update inter-satellite network
+    const netNodes = pos.map(p => ({
+      id: p.id,
+      pos: new THREE.Vector3(p.x, p.y, p.z),
+      constellation: p.constellation || 'Unknown',
+    }));
+    sceneManager.networkRenderer.updateNetwork(netNodes);
+
     updateTimeDisplay(simTime, simSpeed);
     updateStatsTime(simTime);
 
@@ -262,6 +280,16 @@ function buildPositionData(satManager: SatelliteManager): SatellitePositionData[
       constellation: deriveConstellation(s.data.name),
       health: deriveHealth(s),
     }));
+}
+
+function buildLabelData(positions: SatellitePositionData[]): { labels: LabelData[]; posMap: Map<string, THREE.Vector3> } {
+  const labels: LabelData[] = [];
+  const posMap = new Map<string, THREE.Vector3>();
+  for (const p of positions) {
+    labels.push({ id: p.id, name: p.name, constellation: p.constellation, health: p.health });
+    posMap.set(p.id, new THREE.Vector3(p.x, p.y, p.z));
+  }
+  return { labels, posMap };
 }
 
 function drawAllOrbits(

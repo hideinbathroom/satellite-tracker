@@ -379,22 +379,29 @@ export class SatelliteRenderer {
     }
   }
 
+  // Shared glow texture (created once, reused by all sprites)
+  private static _sharedGlowTexture: THREE.CanvasTexture | null = null;
+
+  private static getSharedGlowTexture(): THREE.CanvasTexture {
+    if (!SatelliteRenderer._sharedGlowTexture) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d')!;
+      const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+      gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.3)');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 64, 64);
+      SatelliteRenderer._sharedGlowTexture = new THREE.CanvasTexture(canvas);
+    }
+    return SatelliteRenderer._sharedGlowTexture;
+  }
+
   private createGlowSprite(): THREE.Sprite {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d')!;
-
-    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-    gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.3)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 64, 64);
-
-    const texture = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({
-      map: texture,
+      map: SatelliteRenderer.getSharedGlowTexture(),
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,

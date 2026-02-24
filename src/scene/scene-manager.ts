@@ -9,12 +9,15 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { createEarth, updateEarth, setGridVisible } from './earth.js';
+import { createEarth, updateEarth, setGridVisible, setAtmosphereVisible } from './earth.js';
 import { SatelliteRenderer } from './satellites.js';
 import type { SatellitePositionData } from './satellites.js';
 import { OrbitRenderer } from './orbits.js';
 import { createBackground, updateBackground } from './background.js';
 import { setupPostProcessing, resizePostProcessing } from './post-processing.js';
+import { LabelManager } from './labels.js';
+import { CoverageRenderer } from './coverage.js';
+import { NetworkRenderer } from './network.js';
 
 const DEFAULT_CAMERA_POSITION = new THREE.Vector3(0, 2, 6);
 const CAMERA_FOV = 45;
@@ -38,6 +41,9 @@ export class SceneManager {
   private starfield!: THREE.Points;
   private _satelliteRenderer!: SatelliteRenderer;
   private _orbitRenderer!: OrbitRenderer;
+  private _labelManager!: LabelManager;
+  private _coverageRenderer!: CoverageRenderer;
+  private _networkRenderer!: NetworkRenderer;
 
   // Camera animation state
   private cameraTarget: THREE.Vector3 | null = null;
@@ -111,6 +117,9 @@ export class SceneManager {
 
     this._satelliteRenderer = new SatelliteRenderer(this.scene);
     this._orbitRenderer = new OrbitRenderer(this.scene);
+    this._labelManager = new LabelManager(this.container, this.camera);
+    this._coverageRenderer = new CoverageRenderer(this.scene);
+    this._networkRenderer = new NetworkRenderer(this.scene);
 
     // --- Post-processing ---
     this.composer = setupPostProcessing(this.renderer, this.scene, this.camera);
@@ -139,6 +148,18 @@ export class SceneManager {
 
   get orbitRenderer(): OrbitRenderer {
     return this._orbitRenderer;
+  }
+
+  get labelManager(): LabelManager {
+    return this._labelManager;
+  }
+
+  get coverageRenderer(): CoverageRenderer {
+    return this._coverageRenderer;
+  }
+
+  get networkRenderer(): NetworkRenderer {
+    return this._networkRenderer;
   }
 
   // --- Satellite management pass-through ---
@@ -177,6 +198,11 @@ export class SceneManager {
     setGridVisible(this.earthGroup, visible);
   }
 
+  /** Toggle atmosphere layers + clouds */
+  setAtmosphereVisible(visible: boolean): void {
+    setAtmosphereVisible(this.earthGroup, visible);
+  }
+
   // --- Render loop ---
 
   /** Single frame render with post-processing */
@@ -197,6 +223,8 @@ export class SceneManager {
     updateEarth(this.earthGroup, delta);
     updateBackground(this.starfield, delta);
     this._satelliteRenderer.update(delta);
+    this._orbitRenderer.update(delta);
+    this._networkRenderer.update(delta);
 
     // Smooth camera animation
     if (this.cameraAnimating && this.cameraTarget && this.cameraLookTarget) {
@@ -218,6 +246,10 @@ export class SceneManager {
 
     // Render with post-processing
     this.render();
+
+    // Render CSS2D labels on top
+    this._labelManager.resolveOverlaps(this.scene);
+    this._labelManager.render(this.scene, this.camera);
   }
 
   /** Start the animation loop */
@@ -249,6 +281,7 @@ export class SceneManager {
     this.renderer.setSize(width, height);
     const pixelRatio = this.renderer.getPixelRatio();
     resizePostProcessing(this.composer, width, height, pixelRatio);
+    this._labelManager.resize(width, height);
   };
 
   /** Full cleanup of all GPU resources */
@@ -258,6 +291,9 @@ export class SceneManager {
 
     this._satelliteRenderer.dispose();
     this._orbitRenderer.dispose();
+    this._labelManager.dispose(this.scene);
+    this._coverageRenderer.dispose();
+    this._networkRenderer.dispose();
 
     // Dispose starfield
     this.starfield.geometry.dispose();
